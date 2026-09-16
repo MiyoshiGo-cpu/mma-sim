@@ -564,12 +564,13 @@ const PLAN_DESC = {
 
 // 重点を選ぶと、その能力が大きく伸び、関連する能力も一緒に伸びる（配分の合計はそろえる）
 const TRAIN = {
-  str: { name: '打撃練習', desc: 'ミット打ちとスパーで打撃を磨きます', a: { str: 1.2, iq: .35, car: .35, chn: .2, phy: .15, wre: .1, bjj: .05 } },
+  str: { name: '打撃練習', desc: 'ミット打ちとスパーで打撃を磨きます', a: { str: 1.2, iq: .35, car: .35, chn: .35, phy: .15, wre: .1, bjj: .05 } },
   wre: { name: 'レスリング', desc: 'タックルと差し合いを繰り返します', a: { wre: 1.2, phy: .45, car: .45, iq: .2, bjj: .15, str: .1, chn: .1 } },
   bjj: { name: '柔術・寝技', desc: 'スパーで極めと守りを覚えます', a: { bjj: 1.2, wre: .35, iq: .35, car: .3, phy: .15, str: .05, chn: .05 } },
-  phy: { name: 'フィジカル強化', desc: 'ウエイトで体の強さを作ります', a: { phy: 1.2, chn: .35, str: .25, wre: .25, car: .25, bjj: .05, iq: .05 } },
+  phy: { name: 'フィジカル強化', desc: 'ウエイトで体の強さを作ります', a: { phy: 1.2, chn: .5, str: .25, wre: .25, car: .25, bjj: .05, iq: .05 } },
+  neck: { name: '首・体幹トレ', desc: '首と体幹を鍛え、打撃を効かされにくい体を作ります', a: { chn: 1.2, phy: .45, car: .25, str: .1, wre: .1, iq: .05 } },
   car: { name: '走り込み', desc: '心肺を鍛え、最終ラウンドまで動ける体にします', a: { car: 1.25, phy: .3, chn: .15, iq: .1, str: .1, wre: .1, bjj: .05 } },
-  bal: { name: 'MMAスパーリング', desc: '総合の形で、すべてを少しずつ伸ばします', a: { str: .55, wre: .55, bjj: .55, iq: .5, car: .45, chn: .3, phy: .3 } },
+  bal: { name: 'MMAスパーリング', desc: '総合の形で、すべてを少しずつ伸ばします', a: { str: .55, wre: .55, bjj: .55, iq: .5, car: .45, chn: .4, phy: .3 } },
   weak: { name: '弱点克服', desc: '打撃・レスリング・柔術のうち、一番低いものを集中して鍛えます', a: null },
   scout: { name: '相手対策', desc: '相手の映像を研究し、当日の試合IQが上がります', camp: true, a: { str: .35, wre: .35, bjj: .35, chn: .2, car: .4, phy: .35, iq: .7 } },
   rest: { name: '休養', desc: 'ほとんど伸びませんが、蓄積ダメージが抜けます', trainOnly: true, a: { str: .1, wre: .1, bjj: .1, chn: .05, car: .05, phy: .05, iq: .2 } },
@@ -621,6 +622,16 @@ const NAT_MIX = {
   dwcs: [['us', 3], ['br', 3], ['mx', 1.5], ['ru', 1.5], ['eu', 1]],
   ufc: [['us', 3], ['br', 3], ['ru', 2.2], ['eu', 1.5], ['mx', 1], ['cn', .5], ['kr', .4], ['kz', .4], ['jp', .5]],
 };
+// 軽量級ほど日本・アジア勢が多く、重い階級ほど少ない（海外団体）
+const LIGHT_NATS = ['jp', 'kr', 'cn', 'ph'];
+const CLASS_NAT = { fly: 1.6, ban: 1.4, fea: .9, lig: .45, wel: .18, mid: .08, lhw: .04, hvy: .03 };
+function natMix(promo, cls) {
+  const base = NAT_MIX[promo] || [['jp', 1]];
+  if (['ama', 'deep', 'shooto', 'pancrase'].includes(promo) || !CLASS_NAT[cls]) return base;
+  const f = promo === 'rizin' ? Math.sqrt(CLASS_NAT[cls]) : CLASS_NAT[cls];
+  const heavyBoost = { fly: .8, ban: .9, fea: 1, lig: 1.1, wel: 1.2, mid: 1.3, lhw: 1.4, hvy: 1.5 }[cls];
+  return base.map(([n, w]) => [n, LIGHT_NATS.includes(n) ? w * f : ['ru', 'br', 'us', 'eu'].includes(n) ? w * heavyBoost : w]);
+}
 function genName(nat) {
   if (nat === 'jp') return pick(JP_SUR) + ' ' + pick(JP_GIV);
   if (nat === 'cn' || nat === 'kr') return pick(FOR_GIV[nat]) + '・' + pick(FOR_SUR[nat]);
@@ -668,7 +679,7 @@ function genNPC(promo, cls, o = {}) {
   const P = PROMOS[promo];
   const target = o.ov != null ? o.ov : clamp(P.mean + gauss() * P.sd, 14, 93);
   const style = o.style || wpick([['striker', 3], ['wrestler', 2.2], ['grappler', 1.6], ['all', 1.6]]);
-  const nat = o.nat || wpick(NAT_MIX[promo] || [['jp', 1]]);
+  const nat = o.nat || wpick(natMix(promo, cls));
   const c = CLS[cls];
   const tierAge = [[18, 28], [21, 34], [23, 35], [24, 36]][P.tier];
   const age = o.age != null ? o.age : ri(tierAge[0], tierAge[1]);
@@ -759,7 +770,7 @@ function makeCaps(cand, tal, bonus) {
   for (const k of STATS) {
     const start = cand.base[k] + (bonus[k] || 0);
     let c = tal.base - 4 + gauss() * (tal.manual ? 2 : 4) + (bg.prim.includes(k) ? 3 : 0);
-    if (k === 'chn') c = clamp(start + rnd(6, 20) + (tal.base - 72) * .3, 40, 95);
+    if (k === 'chn') c = clamp(tal.base - 6 + gauss() * (tal.manual ? 2 : 4) + (bg.prim.includes(k) ? 3 : 0), start + 10, 95);
     caps[k] = r1(clamp(Math.max(c, start + 6), 30, 99));
   }
   return caps;
@@ -1419,7 +1430,7 @@ function trainMonth(st, trainKey, eff, noise) {
   for (const k of STATS) {
     const cur = st.stats[k], gap = Math.max(0, st.caps[k] - cur);
     let g = K_GROW * a[k] * eff * tg * ageF * nb * Math.min(1.4, gap / 30) * (noise === false ? 1 : rnd(.75, 1.25));
-    if (k === 'chn') g *= .45;
+    if (k === 'chn') g *= .85;
     let dec = 0;
     const da = age - shift;
     if (da >= 31) { if (k === 'phy' || k === 'car' || k === 'chn') dec = .055 * (da - 30); else if (k !== 'iq') dec = .022 * (da - 31); }
@@ -1624,7 +1635,7 @@ const winPct = (st) => st.rec.w / Math.max(1, st.rec.w + st.rec.l);
 const excl = (st) => !!(st.contract && PROMOS[st.contract.promo].excl && st.contract.left > 0);
 function oneEligible(st) { const p = playerOv(st); return (st.rec.w >= 6 && p >= 56 && winPct(st) >= .7) || (st.belt && p >= 54); }
 function pflEligible(st) { return st.rec.w >= 8 && playerOv(st) >= 60; }
-function ufcDirectEligible(st) { const b = st.belt; return playerOv(st) >= 67 && st.age <= 34 && b && (['rizin', 'one', 'pfl'].includes(b.promo) || st.rec.w >= 10); }
+function ufcDirectEligible(st) { const b = st.belt; return playerOv(st) >= 69 && st.age <= 34 && b && (['rizin', 'one', 'pfl'].includes(b.promo) || st.rec.w >= 10); }
 
 function signOffer(st, promo, renewal) {
   const pov = playerOv(st);
@@ -1746,7 +1757,7 @@ function applyTryout(st, kind) {
   const y = ymOf(st.t).y;
   st.applied[kind + y] = true;
   const pov = playerOv(st);
-  const p = kind === 'rtu' ? sig((pov + st.rec.w * .6 + st.fame * .1 - 66) / 4) : sig((pov + st.rec.w * .5 - 70) / 4);
+  const p = kind === 'rtu' ? sig((pov + st.rec.w * .6 + st.fame * .1 - 68.5) / 4) : sig((pov + st.rec.w * .5 - 72.5) / 4);
   const ok = R() < p;
   const label = kind === 'rtu' ? 'Road to UFC' : 'コンテンダーシリーズ';
   if (ok) {
@@ -2193,6 +2204,24 @@ function migrate(st) {
     if (frac != null) { const e = nr.fs.map((x) => x.elo).sort((a, b) => b - a); st.elo[key] = e[Math.min(e.length - 1, Math.round(frac * (e.length - 1)))] - 1; }
   }
   if (!st.fs) st.fs = normFS(null, st.bg);
+  // 打たれ強さの上限を引き上げる（以前のセーブ向け）
+  if (!st.fixChn && st.caps && st.tal) { st.caps.chn = Math.max(st.caps.chn, clamp(st.tal.base - 6, st.stats.chn + 8, 95)); st.fixChn = true; }
+  // 海外団体の重い階級にいる日本人選手を、階級に合った国籍の選手に入れ替える
+  for (const [key, r] of Object.entries(st.rosters || {})) {
+    if (r.natFix) continue;
+    const [pr, cl] = key.split('|');
+    if (['ufc', 'one', 'pfl', 'rizin'].includes(pr)) {
+      const mix = natMix(pr, cl), base = NAT_MIX[pr] || [];
+      const ratio = (n) => { const a = mix.find((x) => x[0] === n), b = base.find((x) => x[0] === n); return a && b && b[1] ? a[1] / b[1] : 1; };
+      for (const n of r.fs) {
+        if (LIGHT_NATS.includes(n.nat) && R() > ratio(n.nat)) {
+          const nat = wpick(mix.filter((x) => !LIGHT_NATS.includes(x[0])));
+          n.nat = nat; n.name = genName(nat);
+        }
+      }
+    }
+    r.natFix = true;
+  }
   Object.values(st.rosters || {}).forEach((r) => r.fs.forEach(fixN));
   (st.rivals || []).forEach(fixN); (st.offers || []).forEach((o) => fixN(o.opp)); if (st.fight) fixN(st.fight.opp);
   if (!st.tal) { const T = TALENTS[st.talent] || TALENTS.普通; st.tal = { manual: false, tier: st.talent, base: T.cap, g: T.g, growth: '普通', dur: 3, men: 3, star: 3, cut: 3, hint: { growth: '普通', dur: 3, men: 3, star: 3, cut: 3 } }; }
